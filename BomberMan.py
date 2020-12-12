@@ -73,7 +73,7 @@ class Board:  # Generate board 29x11
                         self.table[y][x] = 2
 
 
-class Player(Board):
+class Player(Board):  # Responsible for movement and placing bombs
     def __init__(self):
         super().__init__()
 
