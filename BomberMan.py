@@ -1,6 +1,27 @@
 import pygame
 import random as rnd
 import copy
+import os
+
+
+rand = 0
+
+
+def load_image(name, colorkey=None):
+    fullname = os.path.join('pictures', name)
+    try:
+        image = pygame.image.load(fullname)
+    except AttributeError:
+        print('error')
+    else:
+        if colorkey is not None:
+            image = image.convert()
+            if colorkey == -1:
+                colorkey = image.get_at((0, 0))
+            image.set_colorkey(colorkey)
+        else:
+            image = image.convert_alpha()
+        return image
 
 
 class Board:  # Generate board 29x11
@@ -11,54 +32,20 @@ class Board:  # Generate board 29x11
         self.left = 25
         self.top = 25
         self.table = [[0] * self.width for _ in range(self.height)]
-        self.table[0][0] = 3
         self.walls()
         self.destroyable_walls()
+        self.table[0][0] = 0
 
-    def render(self, screen):
-        for i in range(self.height):
-            for j in range(self.width):
-                if self.table[i][j] == 0:
-                    pygame.draw.rect(screen, pygame.Color('white'), (self.left + self.cell_size * j, self.top +
-                                                                     self.cell_size * i, self.cell_size, self.cell_size),
-                                     0 if self.table[i][j] else 1)
-                elif self.table[i][j] == 1:
-                    pygame.draw.rect(screen, pygame.Color('white'), (self.left + self.cell_size * j, self.top +
-                                                                     self.cell_size * i, self.cell_size,
-                                                                     self.cell_size),
-                                     0 if self.table[i][j] else 1)
-                elif self.table[i][j] == 2:
-                    pygame.draw.rect(screen, pygame.Color('brown'), ((self.left + self.cell_size * j) + 1,
-                                                                     (self.top + self.cell_size * i) + 1,
-                                                                     self.cell_size, self.cell_size), 0)
-                    pygame.draw.rect(screen, pygame.Color('white'), (self.left + self.cell_size * j, self.top +
-                                                                     self.cell_size * i, self.cell_size, self.cell_size)
-                                     , 1)
-                elif self.table[i][j] == 3:
-                    pygame.draw.line(screen, pygame.Color('blue'), (self.left + self.cell_size * j, self.top +
-                                                                    self.cell_size * i),
-                                     (self.cell_size + self.left + self.cell_size * j,
-                                      self.cell_size + self.top + self.cell_size * i), 5)
-                    pygame.draw.rect(screen, pygame.Color('white'), (self.left + self.cell_size * j, self.top +
-                                                                     self.cell_size * i, self.cell_size, self.cell_size)
-                                     , 1)
-                elif self.table[i][j] == 4:
-                    pygame.draw.circle(screen, pygame.Color('grey'), (self.cell_size // 2 + self.left +
-                                                                      self.cell_size * j,
-                                                                      self.cell_size // 2 + self.top +
-                                                                      self.cell_size * i), self.cell_size // 2.5)
-                    pygame.draw.rect(screen, pygame.Color('white'), (self.left + self.cell_size * j, self.top +
-                                                                     self.cell_size * i, self.cell_size,
-                                                                     self.cell_size), 1)
-
-    def walls(self):
+    def walls(self):  # create undestroyable walls
         for i in (1, 3, 5, 7, 9):
             for j in (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27):
                 self.table[i][j] = 1
 
-    def destroyable_walls(self):
+    def destroyable_walls(self):  # Create destroyable walls
+        global rand
         coords_of_walls = []
-        for i in range(rnd.randint(100, 300)):
+        rand = rnd.randint(100, 300)
+        for i in range(rand):
             y = rnd.randint(0, 10)
             x = rnd.randint(0, 28)
             while (x, y) in coords_of_walls:
@@ -72,95 +59,23 @@ class Board:  # Generate board 29x11
                     else:
                         self.table[y][x] = 2
 
+    def draw_everything(self):  # Draw obstacles
+        for y in range(self.height):
+            for x in range(self.width):
+                if self.table[y][x] == 2:
+                    Tile('destroyable_wall', self.left + self.cell_size * x, self.top + self.cell_size * y)
+                    self.table[y][x] = 20
+                if self.table[y][x] == 1:
+                    Tile('wall', self.left + self.cell_size * x, self.top + self.cell_size * y)
+                    self.table[y][x] = 10
+                if self.table[y][x] == 0:
+                    Tile('grass', self.left + self.cell_size * x, self.top + self.cell_size * y)
 
-class Player(Board):  # Responsible for movement and placing bombs
-    def __init__(self):
-        super().__init__()
+    def get_back(self, new_table):
+        self.table = copy.deepcopy(new_table)
 
-    def move_down(self):
-        self.new_table = copy.deepcopy(self.table)
-        x, y = None, None
-        for i in range(self.height):
-            for j in range(self.width):
-                if self.new_table[i][j] == 3:
-                    x, y = j, i
-        if y is not None:
-            if y != len(self.new_table) - 1:
-                if self.new_table[y + 1][x] == 0:
-                    self.new_table[y][x] = 0
-                    self.new_table[y + 1][x] = 3
-        self.table = copy.deepcopy(self.new_table)
-
-    def move_up(self):
-        self.new_table = copy.deepcopy(self.table)
-        x, y = None, None
-        for i in range(self.height):
-            for j in range(self.width):
-                if self.new_table[i][j] == 3:
-                    x, y = j, i
-        if y is not None:
-            if self.new_table[y - 1][x] == 0:
-                if y - 1 in range(len(self.new_table) - 1):
-                    self.new_table[y][x] = 0
-                    self.new_table[y - 1][x] = 3
-        self.table = copy.deepcopy(self.new_table)
-
-    def move_left(self):
-        self.new_table = copy.deepcopy(self.table)
-        x, y = None, None
-        for i in range(self.height):
-            for j in range(self.width):
-                if self.new_table[i][j] == 3:
-                    x, y = j, i
-        if x is not None:
-            if self.new_table[y][x - 1] == 0:
-                if x - 1 in range(len(self.new_table[y]) - 1):
-                    self.new_table[y][x] = 0
-                    self.new_table[y][x - 1] = 3
-        self.table = copy.deepcopy(self.new_table)
-
-    def move_right(self):
-        self.new_table = copy.deepcopy(self.table)
-        x, y = None, None
-        for i in range(self.height):
-            for j in range(self.width):
-                if self.new_table[i][j] == 3:
-                    x, y = j, i
-        if x is not None:
-            if x != len(self.new_table[y]) - 1:
-                if self.new_table[y][x + 1] == 0:
-                    self.new_table[y][x] = 0
-                    self.new_table[y][x + 1] = 3
-        self.table = copy.deepcopy(self.new_table)
-
-    def place_bomb(self, direction):
-        self.new_table = copy.deepcopy(self.table)
-        x, y = None, None
-        for i in range(self.height):
-            for j in range(self.width):
-                if self.new_table[i][j] == 3:
-                    x, y = j, i
-        if direction == 'down' or direction == 'up':
-            if y is not None:
-                if direction == 'down':
-                    if y != len(self.table) - 1:
-                        if self.new_table[y + 1][x] == 0:
-                            self.new_table[y + 1][x] = 4
-                else:
-                    if y != 0:
-                        if self.new_table[y - 1][x] == 0:
-                            self.new_table[y - 1][x] = 4
-        else:
-            if x is not None:
-                if direction == 'left':
-                    if x != 0:
-                        if self.new_table[y][x - 1] == 0:
-                            self.new_table[y][x - 1] = 4
-                else:
-                    if x != len(self.table[y]) - 1:
-                        if self.new_table[y][x + 1] == 0:
-                            self.new_table[y][x + 1] = 4
-        self.table = copy.deepcopy(self.new_table)
+    def send_table(self):
+        return self.table
 
 
 if __name__ == '__main__':
@@ -168,30 +83,130 @@ if __name__ == '__main__':
     size = width, height = 1900, 750
     pygame.display.set_caption('BomberMan')
     screen = pygame.display.set_mode(size)
+    pl_sp_gr = pygame.sprite.Group()
+    bomb_group = pygame.sprite.Group()
+    destr_wall = pygame.sprite.Group()
+    wall = pygame.sprite.Group()
+    grass = pygame.sprite.Group()
     board = Board()
-    player = Player()
+    tile_width = tile_height = 64
+    cell_size = 64
+    top = 25
+    left = 25
+    amount_of_bombs = 1
+
+    tile_images = {  # Tile names and images
+        'destroyable_wall': load_image('break_wall.png'),
+        'wall': load_image('wall.png'),
+        'grass': load_image('grass.png')
+    }
+
+    class Player(pygame.sprite.Sprite, Board):  # Responsible for movement
+        image = load_image('bomberman.png')
+
+        def __init__(self, *args):
+            pygame.sprite.Sprite.__init__(self, *args)
+            Board.__init__(self)
+            self.player_image = Player.image
+            self.rect = self.player_image.get_rect()
+            self.rect.x = self.cell_size // 2.5
+            self.rect.y = self.cell_size // 2.5
+
+        def update(self, *args):
+            self.new_table = args[0]
+            pressed_key = pygame.key.get_pressed()
+            if pressed_key[pygame.K_DOWN]:
+                if self.rect.y + self.cell_size < self.cell_size * self.height + self.top:
+                    if self.new_table[(self.rect.y + int(self.cell_size * 0.6)) // self.cell_size][self.rect.x // self.cell_size] == 0:
+                        self.rect.y += 60 / fps
+            if pressed_key[pygame.K_UP]:
+                if self.rect.y + self.cell_size > self.top + self.cell_size:
+                    if self.new_table[(self.rect.y - int(self.cell_size * 0.25)) // self.cell_size][self.rect.x // self.cell_size] == 0:
+                        self.rect.y -= 60 / fps
+            if pressed_key[pygame.K_LEFT]:
+                if self.rect.x > self.top:
+                    if self.new_table[self.rect.y // self.cell_size][(self.rect.x - int(self.cell_size * 0.25)) // self.cell_size] == 0:
+                        self.rect.x -= 60 / fps
+            if pressed_key[pygame.K_RIGHT]:
+                if self.rect.x + self.cell_size < self.left + self.cell_size * self.width:
+                    if self.new_table[self.rect.y // self.cell_size][(self.rect.x + int(self.cell_size * 0.6)) // self.cell_size] == 0:
+                        self.rect.x += 60 / fps
+
+        def get_coords(self):  # Returns player coords
+            return self.rect.x, self.rect.y
+
+    class Bomb(pygame.sprite.Sprite):  # Responsible for bomb
+        image = load_image('bomb.png')
+
+        def __init__(self, group, table):
+            super().__init__(group)
+            self.cell_size = cell_size
+            self.top = top
+            self.width = 29
+            self.height = 11
+            self.left = left
+            self.bomb_image = Bomb.image
+            self.rect = self.bomb_image.get_rect()
+            self.rect.x = -70
+            self.rect.y = 0
+            self.table = table
+
+        def update(self, *args):  # Place bomb
+            global amount_of_bombs
+            self.coords = args[0][0] + self.cell_size + self.cell_size // 2, args[0][1] + self.cell_size // 2
+            pressed_key = pygame.key.get_pressed()
+            if pressed_key[pygame.K_z]:
+                self.new_table = copy.deepcopy(self.table)
+                if self.coords[0] in range(self.left, self.left + self.cell_size * self.width) \
+                        and self.coords[1] in range(self.top, self.top + self.cell_size * self.height):
+                    if self.new_table[self.coords[1] // self.cell_size][self.coords[0] // self.cell_size] == 0\
+                            and amount_of_bombs != 0:
+                        self.new_table[self.coords[1] // self.cell_size][self.coords[0] // self.cell_size] = 3
+                        self.rect.x = (self.coords[0] // self.cell_size) * self.cell_size + self.left
+                        self.rect.y = (self.coords[1] // self.cell_size) * self.cell_size + self.top
+                        amount_of_bombs -= 1
+                self.table = copy.deepcopy(self.new_table)
+
+        def send_back(self):
+            return self.table
+
+    class Tile(pygame.sprite.Sprite):  # Draw tile
+        def __init__(self, tile, pos_x, pos_y):
+            self.left = left
+            self.top = top
+            if tile == 'destroyable_wall':
+                super().__init__(destr_wall)
+                self.image = tile_images[tile]
+                self.rect = self.image.get_rect().move(pos_x, pos_y)
+            elif tile == 'wall':
+                super().__init__(wall)
+                self.image = tile_images[tile]
+                self.rect = self.image.get_rect().move(pos_x, pos_y)
+            else:
+                super().__init__(grass)
+                self.image = tile_images[tile]
+                self.rect = self.image.get_rect().move(pos_x, pos_y)
+
+    player = Player(pl_sp_gr)
+    bomb = Bomb(bomb_group, board.send_table())
+    board.draw_everything()
     running = True
-    direction = None
+    fps = 60
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_DOWN:
-                    direction = 'down'
-                    player.move_down()
-                if event.key == pygame.K_UP:
-                    direction = 'up'
-                    player.move_up()
-                if event.key == pygame.K_LEFT:
-                    direction = 'left'
-                    player.move_left()
-                if event.key == pygame.K_RIGHT:
-                    direction = 'right'
-                    player.move_right()
-                if event.key == pygame.K_z:
-                    player.place_bomb(direction)
         screen.fill((0, 0, 0))
-        player.render(screen)
+        destr_wall.draw(screen)
+        destr_wall.update()
+        wall.draw(screen)
+        wall.update()
+        bomb_group.draw(screen)
+        grass.draw(screen)
+        grass.update()
+        bomb.update(player.get_coords(), board.send_table())
+        pl_sp_gr.draw(screen)
+        player.update(board.send_table())
+        board.get_back(bomb.send_back())
         pygame.display.flip()
     pygame.quit()
