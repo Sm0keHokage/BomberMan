@@ -21,6 +21,20 @@ def load_image(name, colorkey=None):
         return image
 
 
+def load_level(filename):
+    filename = "pictures/" + filename + '.txt'
+    # читаем уровень, убирая символы перевода строки
+    print(filename)
+    with open(filename, 'r') as mapFile:
+        level_map = [line.strip() for line in mapFile]
+
+    # и подсчитываем максимальную длину
+    max_width = max(map(len, level_map))
+
+    # дополняем каждую строку пустыми клетками ('.')
+    return list(map(lambda x: list(x.ljust(max_width, '.')), level_map))
+
+
 if __name__ == '__main__':
     pygame.init()
     size = width, height = 1900, 750
@@ -43,10 +57,27 @@ if __name__ == '__main__':
         'grass': load_image('grass.png')
     }
 
+
+    def generate_level(level):
+        new_player, x, y = None, None, None
+        for y in range(len(level)):
+            for x in range(len(level[y])):
+                if level[y][x] == '.':
+                    Tile('grass', x, y)
+                elif level[y][x] == '#':
+                    Tile('wall', x, y)
+                elif level[y][x] == '@':
+                    Tile('grass', x, y)
+                    new_player = Player(pl_sp_gr, x, y)
+                    level[y][x] = '.'
+        # вернем игрока, а также размер поля в клетках
+        return new_player, x, y
+
+
     class Player(pygame.sprite.Sprite):  # Responsible for movement
         image = load_image('bomberman.png')
 
-        def __init__(self, group):
+        def __init__(self, group, pos_x, pos_y):
             super().__init__(group)
             self.cell_size = cell_size
             self.top = top
@@ -55,29 +86,29 @@ if __name__ == '__main__':
             self.width = 29
             self.player_image = Player.image
             self.rect = self.player_image.get_rect()
-            self.rect.x = self.cell_size // 2.5
-            self.rect.y = self.cell_size // 2.5
+            self.rect.x = pos_x
+            self.rect.y = pos_y
 
         def update(self, *args):
             self.new_table = args[0]
             pressed_key = pygame.key.get_pressed()
             if pressed_key[pygame.K_DOWN]:
-                if not pygame.sprite.spritecollideany(self, destr_wall) or not pygame.sprite.spritecollideany(self, wall):
+                if not pygame.sprite.spritecollideany(self, wall):
                     self.rect.y += 60 / FPS
                 else:
                     self.rect.y -= 1
             if pressed_key[pygame.K_UP]:
-                if not pygame.sprite.spritecollideany(self, destr_wall) or not pygame.sprite.spritecollideany(self, wall):
+                if not pygame.sprite.spritecollideany(self, wall):
                     self.rect.y -= 60 / FPS
                 else:
                     self.rect.y += 1
             if pressed_key[pygame.K_LEFT]:
-                if not pygame.sprite.spritecollideany(self, destr_wall) or not pygame.sprite.spritecollideany(self, wall):
+                if not pygame.sprite.spritecollideany(self, wall):
                     self.rect.x -= 60 / FPS
                 else:
                     self.rect.x += 1
             if pressed_key[pygame.K_RIGHT]:
-                if not pygame.sprite.spritecollideany(self, destr_wall) or not pygame.sprite.spritecollideany(self, wall):
+                if not pygame.sprite.spritecollideany(self, wall):
                     self.rect.x += 60 / FPS
                 else:
                     self.rect.x -= 1
@@ -127,18 +158,22 @@ if __name__ == '__main__':
             if tile == 'destroyable_wall':
                 super().__init__(destr_wall)
                 self.image = tile_images[tile]
-                self.rect = self.image.get_rect().move(pos_x, pos_y)
+                self.rect = self.image.get_rect().move(
+                    tile_width * pos_x, tile_height * pos_y)
             elif tile == 'wall':
                 super().__init__(wall)
                 self.image = tile_images[tile]
-                self.rect = self.image.get_rect().move(pos_x, pos_y)
+                self.rect = self.image.get_rect().move(
+                    tile_width * pos_x, tile_height * pos_y)
             elif tile == 'grass':
                 super().__init__(grass)
                 self.image = tile_images[tile]
-                self.rect = self.image.get_rect().move(pos_x, pos_y)
+                self.rect = self.image.get_rect().move(
+                    tile_width * pos_x, tile_height * pos_y)
 
-    player = Player(pl_sp_gr)
-    bomb = Bomb(bomb_group)
+    level_map = load_level('map')
+    player, level_x, level_y = generate_level(level_map)
+    bomb = Bomb(bomb_group, level_map)
     running = True
     FPS = 60
     while running:
@@ -155,6 +190,6 @@ if __name__ == '__main__':
         bomb_group.draw(screen)
         bomb.update(player.get_coords())
         pl_sp_gr.draw(screen)
-        player.update()
+        player.update(level_map)
         pygame.display.flip()
     pygame.quit()
