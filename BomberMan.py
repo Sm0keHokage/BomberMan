@@ -45,11 +45,13 @@ if __name__ == '__main__':
     destr_wall = pygame.sprite.Group()
     wall = pygame.sprite.Group()
     grass = pygame.sprite.Group()
-    tile_width = tile_height = 64
+    tile_width = tile_height = 74
     cell_size = 64
     top = 25
     left = 25
     amount_of_bombs = 1
+    walls = []
+    FPS = 60
 
     tile_images = {  # Tile names and images
         'destroyable_wall': load_image('break_wall.png'),
@@ -65,7 +67,8 @@ if __name__ == '__main__':
                 if level[y][x] == '.':
                     Tile('grass', x, y)
                 elif level[y][x] == '#':
-                    Tile('wall', x, y)
+                    aga = Tile('wall', x, y)
+                    walls.append(aga)
                 elif level[y][x] == '@':
                     Tile('grass', x, y)
                     new_player = Player(pl_sp_gr, x, y)
@@ -88,33 +91,42 @@ if __name__ == '__main__':
             self.rect = self.player_image.get_rect()
             self.rect.x = pos_x
             self.rect.y = pos_y
+            self.dy = 0
+            self.dx = 0
 
         def update(self, *args):
+            self.dx = 60 // FPS
+            self.dy = 60 // FPS
             self.new_table = args[0]
             pressed_key = pygame.key.get_pressed()
-            if pressed_key[pygame.K_DOWN]:
-                if not pygame.sprite.spritecollideany(self, wall):
-                    self.rect.y += 60 / FPS
-                else:
-                    self.rect.y -= 1
-            if pressed_key[pygame.K_UP]:
-                if not pygame.sprite.spritecollideany(self, wall):
-                    self.rect.y -= 60 / FPS
-                else:
-                    self.rect.y += 1
             if pressed_key[pygame.K_LEFT]:
-                if not pygame.sprite.spritecollideany(self, wall):
-                    self.rect.x -= 60 / FPS
-                else:
-                    self.rect.x += 1
+                self.move(-1, 0)
             if pressed_key[pygame.K_RIGHT]:
-                if not pygame.sprite.spritecollideany(self, wall):
-                    self.rect.x += 60 / FPS
-                else:
-                    self.rect.x -= 1
+                self.move(1, 0)
+            if pressed_key[pygame.K_DOWN]:
+                self.move(0, 1)
+            if pressed_key[pygame.K_UP]:
+                self.move(0, -1)
 
         def get_coords(self):  # Returns player coords
             return self.rect.x, self.rect.y
+
+        def check(self, velx, vely):
+            for w in walls:
+                if pygame.sprite.collide_rect(self, w):
+                    if vely > 0:
+                        self.rect.bottom = w.rect.top
+                    if vely < 0:
+                        self.rect.top = w.rect.bottom
+                    if velx > 0:
+                        self.rect.right = w.rect.left
+                    if velx < 0:
+                        self.rect.left = w.rect.right
+
+        def move(self, velx=0, vely=0):
+            self.rect.x += velx
+            self.rect.y += vely
+            self.check(velx, vely)
 
     class Bomb(pygame.sprite.Sprite):  # Responsible for bomb
         image = load_image('bomb.png')
@@ -175,7 +187,7 @@ if __name__ == '__main__':
     player, level_x, level_y = generate_level(level_map)
     bomb = Bomb(bomb_group, level_map)
     running = True
-    FPS = 60
+    clock = pygame.time.Clock()
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
