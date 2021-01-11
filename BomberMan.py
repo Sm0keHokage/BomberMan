@@ -37,7 +37,7 @@ def load_level(filename):
 
 if __name__ == '__main__':
     pygame.init()
-    size = width, height = 1900, 750
+    size = width, height = 1900, 900
     pygame.display.set_caption('BomberMan')
     screen = pygame.display.set_mode(size)
     pl_sp_gr = pygame.sprite.Group()
@@ -45,8 +45,11 @@ if __name__ == '__main__':
     destr_wall = pygame.sprite.Group()
     wall = pygame.sprite.Group()
     grass = pygame.sprite.Group()
+    vertical_border = pygame.sprite.Group()
+    horizontal_border = pygame.sprite.Group()
+    border = pygame.sprite.Group()
     tile_width = tile_height = 74
-    cell_size = 64
+    cell_size = 74
     top = 25
     left = 25
     amount_of_bombs = 1
@@ -67,14 +70,29 @@ if __name__ == '__main__':
                 if level[y][x] == '.':
                     Tile('grass', x, y)
                 elif level[y][x] == '#':
-                    aga = Tile('wall', x, y)
-                    walls.append(aga)
+                    wa = Tile('wall', x, y)
+                    walls.append(wa)
                 elif level[y][x] == '@':
                     Tile('grass', x, y)
                     new_player = Player(pl_sp_gr, x, y)
                     level[y][x] = '.'
         # вернем игрока, а также размер поля в клетках
         return new_player, x, y
+
+    def generate_destroyable_walls(level):
+        coords_of_walls = []
+        for i in range(rnd.randint(100, 200)):
+            y = rnd.randint(0, len(level) - 1)
+            x = rnd.randint(0, len(level[y]) - 1)
+            while (x, y) in coords_of_walls:
+                y = rnd.randint(0, len(level) - 1)
+                x = rnd.randint(0, len(level[y]) - 1)
+            coords_of_walls.append((x, y))
+            if level[y][x] == '.':
+                if (x, y) not in [(0, 0), (0, 1), (1, 0)]:
+                    destroyable_wall = Tile('destroyable_wall', x, y)
+                    walls.append(destroyable_wall)
+                    level[y][x] = '%'
 
 
     class Player(pygame.sprite.Sprite):  # Responsible for movement
@@ -89,24 +107,20 @@ if __name__ == '__main__':
             self.width = 29
             self.player_image = Player.image
             self.rect = self.player_image.get_rect()
-            self.rect.x = pos_x
-            self.rect.y = pos_y
-            self.dy = 0
-            self.dx = 0
+            self.rect.x = pos_x + 2
+            self.rect.y = pos_y + 2
 
         def update(self, *args):
-            self.dx = 60 // FPS
-            self.dy = 60 // FPS
             self.new_table = args[0]
             pressed_key = pygame.key.get_pressed()
             if pressed_key[pygame.K_LEFT]:
-                self.move(-1, 0)
+                self.move(60 // -FPS, 0)
             if pressed_key[pygame.K_RIGHT]:
-                self.move(1, 0)
+                self.move(60 // FPS, 0)
             if pressed_key[pygame.K_DOWN]:
-                self.move(0, 1)
+                self.move(0, 60 // FPS)
             if pressed_key[pygame.K_UP]:
-                self.move(0, -1)
+                self.move(0, 60 // -FPS)
 
         def get_coords(self):  # Returns player coords
             return self.rect.x, self.rect.y
@@ -122,6 +136,16 @@ if __name__ == '__main__':
                         self.rect.right = w.rect.left
                     if velx < 0:
                         self.rect.left = w.rect.right
+            for b in borders:
+                if pygame.sprite.collide_rect(self, b):
+                    if vely > 0:
+                        self.rect.bottom = b.rect.top
+                    if vely < 0:
+                        self.rect.top = b.rect.bottom
+                    if velx > 0:
+                        self.rect.right = b.rect.left
+                    if velx < 0:
+                        self.rect.left = b.rect.right
 
         def move(self, velx=0, vely=0):
             self.rect.x += velx
@@ -183,24 +207,49 @@ if __name__ == '__main__':
                 self.rect = self.image.get_rect().move(
                     tile_width * pos_x, tile_height * pos_y)
 
+
+    class Border(pygame.sprite.Sprite):
+        def __init__(self, x1, y1, x2, y2):
+            super().__init__(border)
+            if x1 == x2:
+                self.add(vertical_border)
+                self.image = pygame.Surface([1, y2 - y1])
+                self.rect = pygame.Rect(x1, y1, 1, y2 - y1)
+            else:
+                self.add(horizontal_border)
+                self.image = pygame.Surface([x2 - x1, 1])
+                self.rect = pygame.Rect(x1, y1, x2 - x1, 1)
+
+
     level_map = load_level('map')
     player, level_x, level_y = generate_level(level_map)
     bomb = Bomb(bomb_group, level_map)
     running = True
-    clock = pygame.time.Clock()
+    generate_destroyable_walls(level_map)
+    highest_border = Border(0, 0, 0, height)
+    lowest_border = Border(width, 0, width, height)
+    left_border = Border(0, 0, width, 0)
+    right_border = Border(0, height, width, height)
+    borders = []
+    borders.append(highest_border)
+    borders.append(lowest_border)
+    borders.append(left_border)
+    borders.append(right_border)
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
         screen.fill((0, 0, 0))
-        destr_wall.draw(screen)
-        destr_wall.update()
         wall.draw(screen)
         wall.update()
         grass.draw(screen)
         grass.update()
+        destr_wall.draw(screen)
+        destr_wall.update()
         bomb_group.draw(screen)
         bomb.update(player.get_coords())
+        border.draw(screen)
+        border.update()
         pl_sp_gr.draw(screen)
         player.update(level_map)
         pygame.display.flip()
