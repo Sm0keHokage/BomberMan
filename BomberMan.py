@@ -4,7 +4,7 @@ import pyganim
 import os
 import sys
 import random
-from copy import deepcopy
+
 
 MAIN_WIDTH = 800  # Ширина создаваемого окна
 MAIN_HEIGHT = 900  # Высота
@@ -123,7 +123,8 @@ class Player(sprite.Sprite):
         # Анимация движения влево
         self.boltAnimLeft = pyganim.PygAnimation(ANIMATION_LEFT)
         self.boltAnimLeft.play()
-
+        #self.step = pygame.mixer.Sound(os.path.join('pictures', 'step.ogg'))
+        #self.step.set_volume(0.05)
         self.boltAnimStay = pyganim.PygAnimation(ANIMATION_DOWN)
         self.boltAnimStay.play()
         self.boltAnimStay.blit(self.image, (0, 0))  # По-умолчанию, стоим
@@ -136,11 +137,11 @@ class Player(sprite.Sprite):
             self.image.fill(Color(COLOR))
             self.yvel = -MOVE_SPEED
             self.boltAnimUp.blit(self.image, (0, 0))
-
+            #self.step.play()
         if down:
             self.yvel = MOVE_SPEED
             self.image.fill(Color(COLOR))
-
+            #self.step.play()
         if left:
             self.xvel = -MOVE_SPEED  # Лево = x- n
             self.image.fill(Color(COLOR))
@@ -148,7 +149,7 @@ class Player(sprite.Sprite):
                 self.boltAnimLeft.blit(self.image, (0, 0))
             else:
                 self.boltAnimLeft.blit(self.image, (0, 0))
-
+            #self.step.play()
         if right:
             self.xvel = MOVE_SPEED  # Право = x + n
             self.image.fill(Color(COLOR))
@@ -156,7 +157,7 @@ class Player(sprite.Sprite):
                 self.boltAnimRight.blit(self.image, (0, 0))
             else:
                 self.boltAnimRight.blit(self.image, (0, 0))
-
+            #self.step.play()
         if not (left or right):  # стоим, когда нет указаний идти
             self.xvel = 0
             if not up:
@@ -181,12 +182,12 @@ class Player(sprite.Sprite):
                     self.rect.left = p.rect.right  # то не движется влево
 
                 if yvel > 0:  # если падает вниз
-                    self.rect.bottom = p.rect.top  # то не падает вниз
-                    self.yvel = 0  # и энергия падения пропадает
+                    self.rect.bottom = p.rect.top  # то не движется вниз
+                    self.yvel = 0
 
                 if yvel < 0:  # если движется вверх
                     self.rect.top = p.rect.bottom  # то не движется вверх
-                    self.yvel = 0  # и энергия прыжка пропадает
+                    self.yvel = 0
 
     def get_coords(self):
         return self.rect.x, self.rect.y
@@ -218,7 +219,6 @@ class Camera:
 
 class Destroyable_wall(pygame.sprite.Sprite):
     def __init__(self, x, y):
-        print(x, y)
         sprite.Sprite.__init__(self)
         self.image = Surface((PLATFORM_WIDTH, PLATFORM_HEIGHT))
         self.image = load_image('break_wall.png')
@@ -234,7 +234,7 @@ def generate_destroyable_walls(level):
             y = random.randint(0, len(level) - 1)
             x = random.randint(0, len(level[y]) - 1)
         if level[y][x] == '.':
-            if (x, y) not in [(0, 0), (0, 1), (1, 0)]:
+            if (x, y) not in [(1, 1), (1, 2), (2, 1)]:
                 level[y][x] = '%'
                 coords_of_walls.append((x, y))
 
@@ -253,9 +253,13 @@ def camera_configure(camera, target_rect):
 
 
 def main():
+    pygame.mixer.pre_init(44100, -16, 1, 512)
     pygame.init()  # Инициация PyGame, обязательная строчка
     pygame.display.set_caption("BomberMan")  # Пишем в шапку
     start_screen()
+    pygame.mixer.music.load(os.path.join('pictures', 'background.mp3'))
+    pygame.mixer.music.set_volume(0.02)
+    pygame.mixer.music.play(-1)
     bg = Surface((MAIN_WIDTH, MAIN_HEIGHT))  # Создание видимой поверхности
     # будем использовать как фон
     bg.fill(Color(BACKGROUND_COLOR))  # Заливаем поверхность сплошным цветом
@@ -264,12 +268,11 @@ def main():
     hero = Player(70, 70)  # создаем героя по (x,y) координатам
     up = down = left = right = False  # по умолчанию - стоим
     level = load_level('map')
-    counter, text = 200, 'TIME 200'.rjust(3)
+    counter, text = 300, 'TIME 300'.rjust(3)
     pygame.time.set_timer(pygame.USEREVENT, 1000)
     running = True
     all_sprites = pygame.sprite.Group()  # Все объекты
     platforms = []  # то, во что мы будем врезаться или опираться
-
     all_sprites.add(hero)
     generate_destroyable_walls(level)
     x = y = 0  # координаты
