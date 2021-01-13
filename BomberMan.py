@@ -83,9 +83,15 @@ class Tile(pygame.sprite.Sprite):
 def load_level(filename):
     filename = "pictures/" + filename + '.txt'
     # читаем уровень, убирая символы перевода строки
+    print(filename)
     with open(filename, 'r') as mapFile:
-        lst = [line.strip() for line in mapFile]
-    return lst
+        level_map = [line.strip() for line in mapFile]
+
+    # и подсчитываем максимальную длину
+    max_width = max(map(len, level_map))
+
+    # дополняем каждую строку пустыми клетками ('.')
+    return list(map(lambda x: list(x.ljust(max_width, '.')), level_map))
 
 
 MOVE_SPEED = 5
@@ -94,7 +100,6 @@ HEIGHT = 40
 COLOR = "#888888"
 
 ANIMATION_DELAY = 0.1  # скорость смены кадров
-
 
 ANIMATION_RIGHT = [('pictures/bomberman_right.png', 1)]
 ANIMATION_LEFT = [('pictures/bomberman_left.png', 1)]
@@ -211,6 +216,29 @@ class Camera:
         self.state = self.camera_func(self.state, target.rect)
 
 
+class Destroyable_wall(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        print(x, y)
+        sprite.Sprite.__init__(self)
+        self.image = Surface((PLATFORM_WIDTH, PLATFORM_HEIGHT))
+        self.image = load_image('break_wall.png')
+        self.rect = pygame.Rect(x, y, PLATFORM_WIDTH, PLATFORM_HEIGHT)
+
+
+def generate_destroyable_walls(level):
+    coords_of_walls = []
+    for i in range(random.randint(100, 200)):
+        y = random.randint(0, len(level) - 1)
+        x = random.randint(0, len(level[y]) - 1)
+        while (x, y) in coords_of_walls:
+            y = random.randint(0, len(level) - 1)
+            x = random.randint(0, len(level[y]) - 1)
+        if level[y][x] == '.':
+            if (x, y) not in [(0, 0), (0, 1), (1, 0)]:
+                level[y][x] = '%'
+                coords_of_walls.append((x, y))
+
+
 def camera_configure(camera, target_rect):
     l, t, _, _ = target_rect
     _, _, w, h = camera
@@ -236,13 +264,14 @@ def main():
     hero = Player(70, 70)  # создаем героя по (x,y) координатам
     up = down = left = right = False  # по умолчанию - стоим
     level = load_level('map')
-
+    counter, text = 200, 'TIME 200'.rjust(3)
+    pygame.time.set_timer(pygame.USEREVENT, 1000)
     running = True
     all_sprites = pygame.sprite.Group()  # Все объекты
     platforms = []  # то, во что мы будем врезаться или опираться
 
     all_sprites.add(hero)
-
+    generate_destroyable_walls(level)
     x = y = 0  # координаты
     for row in level:  # вся строка
         for col in row:  # каждый символ
@@ -250,6 +279,10 @@ def main():
                 platform = Tile(x, y)
                 all_sprites.add(platform)
                 platforms.append(platform)
+            if col == '%':
+                wall = Destroyable_wall(x, y)
+                all_sprites.add(wall)
+                platforms.append(wall)
 
             x += PLATFORM_WIDTH  # блоки платформы ставятся на ширине блоков
         y += PLATFORM_HEIGHT  # то же самое и с высотой
@@ -257,12 +290,15 @@ def main():
 
     total_level_width = len(level[0]) * PLATFORM_WIDTH  # Высчитываем фактическую ширину уровня
     total_level_height = len(level) * PLATFORM_HEIGHT  # высоту
-
+    font = pygame.font.SysFont('Consolas', 30)
     camera = Camera(camera_configure, total_level_width, total_level_height)
     bomb_check = False
     while running:  # Основной цикл программы
         screen.blit(bg, (0, 0))  # Каждую итерацию необходимо всё перерисовывать
         for event in pygame.event.get():  # Обрабатываем события
+            if event.type == pygame.USEREVENT:
+                counter -= 1
+                text = f'TIME {str(counter).rjust(3)}'
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_UP:
@@ -284,7 +320,7 @@ def main():
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                 Bomb.draw(bomb, hero.get_coords())
                 bomb_check = True
-
+        screen.blit(font.render(text, True, (0, 0, 0)), (50, 850))
         camera.update(hero)  # центризируем камеру относительно персонажа
         hero.update(left, right, up, down, platforms)  # передвижение
         for sprite in all_sprites:
